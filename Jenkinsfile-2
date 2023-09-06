@@ -1,13 +1,14 @@
+def ansibleSERVER = 'ubuntu@3.9.165.153'
 pipeline {
-  agent { label 'linux' }
-  options {
-    buildDiscarder(logRotator(numToKeepStr: '5'))
+  agent any
+  tools {
+    maven 'maven'
   }
   stages {
-    stage('Scan') {
+    stage('Code analysis') {
       steps {
-        withSonarQubeEnv(installationName: 'sq1') { 
-          sh './mvnw clean org.sonarsource.scanner.maven:sonar-maven-plugin:3.9.0.2155:sonar'
+        withSonarQubeEnv(installationName: 'sonar') { 
+          sh 'mvn clean sonar:sonar'
         }
       }
     }
@@ -18,5 +19,18 @@ pipeline {
         }
       }
     }
-  }
+   stage('Build Code'){
+     steps {
+       echo "packaging the application"
+       sh 'mvn clean package'
+       }
+    }
+   stage('Send Artifacts to Ansible Server') {
+     steps { 
+       sshagent(['ansible-key']) {
+         sh "scp -o StrictHostKeyChecking=no target/spring-petclinic-*.war  ${ansibleSERVER}:/home/ubuntu"
+       }
+     }
+   }
+ }
 }
